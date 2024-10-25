@@ -9,11 +9,11 @@ import (
 
 func Calc(expression string) (float64, error) {
 	expression = strings.ReplaceAll(expression, " ", "")
-	return Expression(&expression)
+	return ReviewExpression(&expression)
 }
 
-func Expression(expression *string) (float64, error) {
-	result, err := Terms(expression)
+func ReviewExpression(expression *string) (float64, error) {
+	result, err := ReviewComponent(expression)
 	if err != nil {
 		return 0, err
 	}
@@ -21,18 +21,18 @@ func Expression(expression *string) (float64, error) {
 		switch (*expression)[0] {
 		case '+':
 			*expression = (*expression)[1:]
-			num, err := Terms(expression)
+			nextComp, err := ReviewComponent(expression)
 			if err != nil {
 				return 0, err
 			}
-			result += num
+			result += nextComp
 		case '-':
 			*expression = (*expression)[1:]
-			num, err := Terms(expression)
+			nextComp, err := ReviewComponent(expression)
 			if err != nil {
 				return 0, err
 			}
-			result -= num
+			result -= nextComp
 		default:
 			return result, nil
 		}
@@ -40,8 +40,8 @@ func Expression(expression *string) (float64, error) {
 	return result, nil
 }
 
-func Terms(expression *string) (float64, error) {
-	result, err := Brackets(expression)
+func ReviewComponent(expression *string) (float64, error) {
+	result, err := ReviewFactor(expression)
 	if err != nil {
 		return 0, err
 	}
@@ -49,21 +49,21 @@ func Terms(expression *string) (float64, error) {
 		switch (*expression)[0] {
 		case '*':
 			*expression = (*expression)[1:]
-			num, err := Brackets(expression)
+			nextFactor, err := ReviewFactor(expression)
 			if err != nil {
 				return 0, err
 			}
-			result *= num
+			result *= nextFactor
 		case '/':
 			*expression = (*expression)[1:]
-			num, err := Terms(expression)
+			nextFactor, err := ReviewFactor(expression)
 			if err != nil {
 				return 0, err
 			}
-			if num == 0 {
-				return 0, fmt.Errorf("деление на 0 запрещено")
+			if nextFactor == 0 {
+				return 0, fmt.Errorf("деление на ноль")
 			}
-			result /= num
+			result /= nextFactor
 		default:
 			return result, nil
 		}
@@ -71,57 +71,37 @@ func Terms(expression *string) (float64, error) {
 	return result, nil
 }
 
-func Brackets(expression *string) (float64, error) {
+func ReviewFactor(expression *string) (float64, error) {
 	if len(*expression) == 0 {
-		return 0, fmt.Errorf("неправильный конец выражения")
+		return 0, fmt.Errorf("неожиданный конец выражения")
 	}
 	if (*expression)[0] == '(' {
 		*expression = (*expression)[1:]
-		result, err := Expression(expression)
+		result, err := ReviewExpression(expression)
 		if err != nil {
 			return 0, err
 		}
 		if len(*expression) == 0 || (*expression)[0] != ')' {
-			return 0, fmt.Errorf("пропущены скобки")
+			return 0, fmt.Errorf("пропущены круглые скобки")
 		}
 		*expression = (*expression)[1:]
 		return result, nil
 	}
-	return Nums(expression)
+	return ReviewNumber(expression)
 }
 
-func Nums(expression *string) (float64, error) {
+func ReviewNumber(expression *string) (float64, error) {
 	i := 0
 	for i < len(*expression) && (unicode.IsDigit(rune((*expression)[i])) || (*expression)[i] == '.') {
 		i++
 	}
 	if i == 0 {
-		return 0, fmt.Errorf("введите число, найдено %c", (*expression)[0])
+		return 0, fmt.Errorf("неверное число, найдено '%c'", (*expression)[0])
 	}
 	num, err := strconv.ParseFloat((*expression)[:i], 64)
 	if err != nil {
-		return 0, fmt.Errorf("неверное число: %v", num)
+		return 0, fmt.Errorf("неверное число, ошибка: %v", err)
 	}
 	*expression = (*expression)[i:]
 	return num, nil
-}
-
-func main() {
-	tests := []string{
-		"3 + 5",
-		"(1 + 2) * 3",
-		"10 / 2 + (8 - 3)",
-		"5 + 3 * (12 / 4)",
-		"10 / (5 - 5)", // Ошибка деления на ноль
-		"3 + * 5",      // Ошибка неверного синтаксиса
-		"3 + 12 / 2)",
-	}
-	for _, test := range tests {
-		result, err := Calc(test)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println(result)
-		}
-	}
 }
